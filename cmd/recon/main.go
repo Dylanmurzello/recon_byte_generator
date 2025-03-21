@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -59,6 +60,13 @@ func main() {
 	}
 	defer processor.Close()
 
+	// Step 1: Initialize Gemini with prompt and categories
+	log.Printf("Initializing Gemini AI with prompt and categories...")
+	if err := processor.InitializeGemini(ctx, cfg.PromptPath, cfg.CategoriesPath); err != nil {
+		log.Fatalf("Failed to initialize Gemini: %v", err)
+	}
+	log.Printf("✅ Gemini AI initialized successfully!")
+
 	// Get URL from user
 	fmt.Print("Enter the news URL: ")
 	var url string
@@ -75,8 +83,17 @@ func main() {
 	filename := fmt.Sprintf("%d.json", time.Now().Unix())
 	filePath := filepath.Join(cfg.OutputDir, filename)
 
-	// Process with AI
-	log.Printf("Processing with Gemini AI...")
+	// Convert reconData to JSON and save it
+	reconJSON, err := json.MarshalIndent(reconData, "", "  ")
+	if err != nil {
+		log.Fatalf("Failed to marshal scraped data: %v", err)
+	}
+	if err := os.WriteFile(filePath, reconJSON, 0644); err != nil {
+		log.Fatalf("Failed to save scraped data: %v", err)
+	}
+
+	// Step 2: Process with AI
+	log.Printf("Processing article with Gemini AI...")
 	aiResponse, err := processor.Process(ctx, reconData, cfg.PromptPath, cfg.CategoriesPath)
 	if err != nil {
 		log.Fatalf("Failed to process with AI: %v", err)

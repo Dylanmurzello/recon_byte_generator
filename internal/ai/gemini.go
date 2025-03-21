@@ -1,134 +1,282 @@
 package ai
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"strings"
 
 	"github.com/dylanmurzello/recon_byte_generator/internal/models"
-	genai "github.com/google/generative-ai-go/genai"
-	"google.golang.org/api/option"
 )
+
+const geminiEndpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
 // Processor represents an AI processor
 type Processor struct {
-	client *genai.Client
-	model  *genai.GenerativeModel
+	apiKey string
+	client *http.Client
+}
+
+// Categories represents the structure of the categories JSON file
+type Categories struct {
+	Categories []struct {
+		Name          string   `json:"name"`
+		Subcategories []string `json:"subcategories"`
+	} `json:"categories"`
+}
+
+// GeminiRequest represents the request structure for Gemini API
+type GeminiRequest struct {
+	Contents         []Content         `json:"contents"`
+	GenerationConfig *GenerationConfig `json:"generationConfig,omitempty"`
+}
+
+type GenerationConfig struct {
+	Temperature     float64 `json:"temperature,omitempty"`
+	TopK            int     `json:"topK,omitempty"`
+	TopP            float64 `json:"topP,omitempty"`
+	MaxOutputTokens int     `json:"maxOutputTokens,omitempty"`
+}
+
+type Content struct {
+	Parts []Part `json:"parts"`
+	Role  string `json:"role,omitempty"`
+}
+
+type Part struct {
+	Text string `json:"text"`
+}
+
+// GeminiResponse represents the response structure from Gemini API
+type GeminiResponse struct {
+	Candidates []struct {
+		Content struct {
+			Parts []struct {
+				Text string `json:"text"`
+			} `json:"parts"`
+		} `json:"content"`
+	} `json:"candidates"`
 }
 
 // NewProcessor creates a new AI processor
 func NewProcessor(apiKey string) (*Processor, error) {
-	ctx := context.Background()
-	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
+	if apiKey == "" {
+		return nil, fmt.Errorf("API key cannot be empty")
 	}
 
-	model := client.GenerativeModel("gemini-1.0-pro")
-
 	return &Processor{
-		client: client,
-		model:  model,
+		apiKey: apiKey,
+		client: &http.Client{},
 	}, nil
 }
 
 // Close closes the AI client
 func (p *Processor) Close() error {
-	p.client.Close()
 	return nil
+}
+
+// formatCategories formats the categories into a readable string
+func formatCategories(cats Categories) string {
+	var result strings.Builder
+	result.WriteString("Available Categories:\n")
+
+	for _, cat := range cats.Categories {
+		result.WriteString(fmt.Sprintf("\n%s:\n", cat.Name))
+		for _, sub := range cat.Subcategories {
+			result.WriteString(fmt.Sprintf("  - %s\n", sub))
+		}
+	}
+
+	return result.String()
 }
 
 // Process processes the given ReconByte with AI
 func (p *Processor) Process(ctx context.Context, data *models.ReconByte, promptPath, categoriesPath string) (string, error) {
-	// Read categories
-	categoriesBytes, err := os.ReadFile(categoriesPath)
+	if data == nil || data.Content == "" {
+		return "", fmt.Errorf("invalid input: empty content")
+	}
+
+	// Read prompt template
+	promptTemplate, err := os.ReadFile(promptPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to read categories file: %w", err)
+		return "", fmt.Errorf("failed to read prompt template: %w", err)
 	}
 
-	var categories struct {
-		Categories []struct {
-			Name          string   `json:"name"`
-			Subcategories []string `json:"subcategories"`
-		} `json:"categories"`
+	// Read and parse categories
+	categoriesData, err := os.ReadFile(categoriesPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read categories: %w", err)
 	}
 
-	if err := json.Unmarshal(categoriesBytes, &categories); err != nil {
+	var categories Categories
+	if err := json.Unmarshal(categoriesData, &categories); err != nil {
 		return "", fmt.Errorf("failed to parse categories: %w", err)
 	}
 
-	// Construct a more focused prompt
-	prompt := fmt.Sprintf(`Analyze the following news article and create a Recon Byte report. Focus on:
+	// Format categories into a readable string
+	formattedCategories := formatCategories(categories)
 
-1. Title: Create a clear, concise title for this event
-2. Description: Summarize the key points (who, what, when, where, why, how)
-3. Threat Assessment:
-   - Select the most appropriate category from: %s
-   - Determine severity (None, Low, Medium, High, Critical)
-   - Assess priority (Low, Medium, High)
-   - Evaluate confidence level (None, Low, Medium, High, Critical)
+	// Format the prompt with the article data and categories
+	prompt := fmt.Sprintf(string(promptTemplate),
+		data.URL,
+		data.Author,
+		data.Timestamp,
+		data.Content,
+		formattedCategories)
 
-4. Impact Analysis:
-   - Estimate initial impact (0.1 to 1.0)
-   - Identify affected areas/populations
-   - Project potential escalation
-
-Article Content:
-%s
-
-Format your response as a structured report with clear sections and justifications for your assessments.`,
-		strings.Join(getCategoryNames(categories.Categories), ", "),
-		data.Content)
-
-	// Generate content with safety settings
-	safetySettings := []*genai.SafetySetting{
-		{
-			Category:  genai.HarmCategoryHarassment,
-			Threshold: genai.HarmBlockNone,
+	// Prepare request body
+	reqBody := GeminiRequest{
+		Contents: []Content{
+			{
+				Role: "user",
+				Parts: []Part{
+					{Text: prompt},
+				},
+			},
 		},
-		{
-			Category:  genai.HarmCategoryHateSpeech,
-			Threshold: genai.HarmBlockNone,
+		GenerationConfig: &GenerationConfig{
+			Temperature:     0.7,
+			TopK:            40,
+			TopP:            0.8,
+			MaxOutputTokens: 2048,
 		},
 	}
 
-	p.model.SafetySettings = safetySettings
-
-	// Generate content
-	resp, err := p.model.GenerateContent(ctx, genai.Text(prompt))
+	jsonBody, err := json.Marshal(reqBody)
 	if err != nil {
-		return "", fmt.Errorf("failed to generate AI content: %w", err)
+		return "", fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	if len(resp.Candidates) == 0 {
-		return "", fmt.Errorf("no response candidates received")
+	// Create request
+	url := fmt.Sprintf("%s?key=%s", geminiEndpoint, p.apiKey)
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	// Send request
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Read response
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response: %w", err)
 	}
 
-	var result strings.Builder
-	for _, part := range resp.Candidates[0].Content.Parts {
-		if text, ok := part.(*genai.Text); ok {
-			result.WriteString(string(*text))
-			result.WriteString("\n")
-		}
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
-	if result.Len() == 0 {
-		return "", fmt.Errorf("empty response from AI")
+	// Parse response
+	var geminiResp GeminiResponse
+	if err := json.Unmarshal(body, &geminiResp); err != nil {
+		return "", fmt.Errorf("failed to parse response: %w", err)
 	}
 
-	return result.String(), nil
+	if len(geminiResp.Candidates) == 0 || len(geminiResp.Candidates[0].Content.Parts) == 0 {
+		return "", fmt.Errorf("no response generated")
+	}
+
+	return geminiResp.Candidates[0].Content.Parts[0].Text, nil
 }
 
-// getCategoryNames extracts just the category names from the categories structure
-func getCategoryNames(categories []struct {
-	Name          string   `json:"name"`
-	Subcategories []string `json:"subcategories"`
-}) []string {
-	names := make([]string, len(categories))
-	for i, cat := range categories {
-		names[i] = cat.Name
+// InitializeGemini sends the prompt template and categories to Gemini and waits for acknowledgment
+func (p *Processor) InitializeGemini(ctx context.Context, promptPath, categoriesPath string) error {
+	// Read prompt template
+	promptTemplate, err := os.ReadFile(promptPath)
+	if err != nil {
+		return fmt.Errorf("failed to read prompt template: %w", err)
 	}
-	return names
+
+	// Read and parse categories
+	categoriesData, err := os.ReadFile(categoriesPath)
+	if err != nil {
+		return fmt.Errorf("failed to read categories: %w", err)
+	}
+
+	var categories Categories
+	if err := json.Unmarshal(categoriesData, &categories); err != nil {
+		return fmt.Errorf("failed to parse categories: %w", err)
+	}
+
+	// Format categories into a readable string
+	formattedCategories := formatCategories(categories)
+
+	// Create initialization message
+	initMessage := fmt.Sprintf("Instructions for generating Recon Bytes:\n\n%s\n\nAvailable Categories:\n%s\n\nPlease acknowledge if you understand these instructions.", string(promptTemplate), formattedCategories)
+
+	// Prepare request body
+	reqBody := GeminiRequest{
+		Contents: []Content{
+			{
+				Role: "user",
+				Parts: []Part{
+					{Text: initMessage},
+				},
+			},
+		},
+		GenerationConfig: &GenerationConfig{
+			Temperature:     0.7,
+			TopK:            40,
+			TopP:            0.8,
+			MaxOutputTokens: 2048,
+		},
+	}
+
+	jsonBody, err := json.Marshal(reqBody)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	// Create request
+	url := fmt.Sprintf("%s?key=%s", geminiEndpoint, p.apiKey)
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	// Send request
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Read response
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Parse response
+	var geminiResp GeminiResponse
+	if err := json.Unmarshal(body, &geminiResp); err != nil {
+		return fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	if len(geminiResp.Candidates) == 0 || len(geminiResp.Candidates[0].Content.Parts) == 0 {
+		return fmt.Errorf("no response generated")
+	}
+
+	// Check for acknowledgment
+	response := geminiResp.Candidates[0].Content.Parts[0].Text
+	if !strings.Contains(strings.ToLower(response), "acknowledge") {
+		return fmt.Errorf("Gemini did not acknowledge the instructions properly. Response: %s", response)
+	}
+
+	return nil
 }

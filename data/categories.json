@@ -1,0 +1,53 @@
+{
+  "categories": [
+    {
+      "name": "Cyber Security",
+      "subcategories": [
+        "Data Breach",
+        "Malware",
+        "Ransomware",
+        "Phishing",
+        "DDoS",
+        "Zero-day Exploit"
+      ]
+    },
+    {
+      "name": "Physical Security",
+      "subcategories": [
+        "Facility Breach",
+        "Theft",
+        "Vandalism",
+        "Unauthorized Access",
+        "Surveillance"
+      ]
+    },
+    {
+      "name": "Social Engineering",
+      "subcategories": [
+        "Impersonation",
+        "Insider Threat",
+        "Social Media Exploitation",
+        "Psychological Manipulation"
+      ]
+    },
+    {
+      "name": "Infrastructure",
+      "subcategories": [
+        "Critical Infrastructure",
+        "Supply Chain",
+        "Transportation",
+        "Energy Systems",
+        "Communications"
+      ]
+    },
+    {
+      "name": "Financial",
+      "subcategories": [
+        "Fraud",
+        "Money Laundering",
+        "Market Manipulation",
+        "Cryptocurrency"
+      ]
+    }
+  ]
+} 

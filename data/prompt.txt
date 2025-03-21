@@ -1,0 +1,166 @@
+You are supposed to create a recon byte for me using the instructions below , you must adhere to it 100% and follow it to the T
+
+Introduction to Recon Bytes
+
+A Recon Byte is a structured data entry used to track and assess threats, incidents, and security risks. It helps intelligence analysts, law enforcement, corporate security teams, and emergency response units categorize, analyze, and prioritize threats effectively.
+
+This guide will teach you how to:
+
+Write a Recon Byte
+
+Understand its fields and categories
+
+Apply best practices to ensure consistency and accuracy
+
+1. Understanding Recon Byte Components
+
+Each Recon Byte consists of multiple fields. Below is a breakdown of each component.
+
+1.1 General Information
+
+Title (Text Field) – A clear and concise description of the event.
+
+Description (Text Area) – A summary of the incident, including who, what, when, where, and how.
+
+Threat Assessment Category (Dropdown Selector) – Categorizes the threat type:
+
+Regional Threat
+
+Mobile Threat
+
+Event Threat
+
+Indicator of Threat
+
+Danger Object Threat
+
+Threat Analysis
+
+Location Threat
+
+Status (Dropdown Selector) – The current status of the incident:
+
+Active
+
+Resolved
+
+Under Investigation
+
+1.2 Threat Classification
+
+Threat Category (Analyst) (Dropdown Selector) – Primary category assigned by an intelligence analyst.
+
+Threat Sub-Cat (Analyst) (Dropdown Selector) – Specific subcategory under the analyst's classification.
+
+Threat Category (User) (Dropdown Selector) – Threat classification assigned by a user (field reporter or automated system).
+
+Threat Sub-Cat (User) (Dropdown Selector) – Specific subcategory based on the user's input.
+
+1.3 Severity & Priority Metrics
+
+Type (Dropdown Selector) – Defines the type of incident:
+
+ESM
+
+ESRM
+
+Individual
+
+Severity (Dropdown Selector) – Measures the seriousness of the event:
+
+None, Low, Medium, High, Critical
+
+Priority (Dropdown Selector) – Defines the urgency level:
+
+Low, Medium, High
+
+Confidence (Dropdown Selector) – Indicates the certainty of the data:
+
+None, Low, Medium, High, Critical
+
+Weight (Dropdown Selector) – The importance of the incident:
+
+None, Low, Medium, High, Critical
+
+Influence (Dropdown Selector) – The potential impact:
+
+None, Low, Medium, High, Critical
+
+1.4 Geographic & Proximity Details
+
+Address (Text Field) – The specific location where the incident occurred.
+
+Affect Proximity (Numeric Input) – The radius impacted by the event (value in miles/km).
+
+Proximity Stand Off (Numeric Input) – The buffer distance from the core threat (value in miles/km).
+
+Use Entire Area (Binary Selector) – Whether the entire area should be considered:
+
+0 = No, 1 = Yes
+
+1.5 Time-Based Metrics
+
+Active Recon Byte Time (Numeric Input) – The duration the event is considered active (value in hours).
+
+Max Time Rating Increase (Decimal Input) – The maximum increase in rating over time.
+
+Base Increment (Decimal Input) – The base level of escalation.
+
+Event Occurred On (Date/Time Picker) – The timestamp of when the event happened.
+
+Expires On (Date/Time Picker) – The date/time when the threat is no longer relevant.
+
+1.6 Data Reliability & Source Tracking
+
+Source (Text Field) – The origin of the information (e.g., police reports, news agencies, automated sensors).
+
+Confidence Interval (Dropdown Selector) – The reliability of the source:
+
+Reliable, Usually Reliable, Moderately Reliable, Not Always Reliable, Unreliable, Inconclusive
+
+Accuracy (Dropdown Selector) – The likelihood of the information being correct:
+
+Confirmed, Mostly Accurate, Moderately Accurate, Not Likely Accurate, Inaccurate, Inconclusive
+
+Source ID (Auto-Generated Text) – A unique identifier assigned to the data source.
+
+Format: O-001-003-003-XXXX-2025
+
+1.7 Impact Analysis
+
+Impact Rating (Decimal Input) – Measures the event's severity (0.1 = Minimal to 1.0 = Catastrophic).
+
+Initial Impact Percentage (Percentage Input) – The starting percentage of impact.
+
+Change Rate Over Time (Decimal Input) – How the impact escalates or de-escalates.
+
+Increase Percentage (Percentage Input) – The rate at which the impact grows.
+
+Peak Impact Time (Date/Time Picker) – The expected time when the impact is highest.
+
+Increase Start Time (Date/Time Picker) – When the escalation begins.
+
+1.8 User Interaction & Visibility
+
+Should Push To Users (Binary Selector) – Whether alerts should be sent.
+
+Tap On Map (Binary Selector) – Allows users to interact with location data.
+
+Make This Recon Byte Public (Binary Selector) – Determines if the event is publicly visible.
+
+Recon Byte Without Location (Binary Selector) – Whether location details are included.
+
+2. Threat Assessment Categories & Subcategories
+
+Threats are classified under major categories, each with specific subcategories.
+
+(Take the data from the .json file)
+
+Conclusion
+
+Understanding Recon Bytes is crucial for tracking and assessing threats efficiently. Properly categorizing and analyzing security incidents allows intelligence teams to make informed decisions.
+
+By following this guide, analysts and field teams can ensure accuracy, consistency, and actionable intelligence in their security operations.
+
+
+say acknowledged if you understand 
